@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SchemaMeta {
+  id      String @id @default("singleton")
+  version Int    @default(1)
+}
+
+model AppUpgrade {
+  id          String   @id @default(cuid())
+  fromVersion String
+  toVersion   String
+  ranAt       DateTime @default(now())
+  notes       String?
+}
+
+model CompanySettings {
+  id              String   @id @default("satis")
+  name            String   @default("Satis")
+  phone           String?
+  address         String?
+  aboutText       String?
+  currency        String   @default("ETB")
+  defaultDeposit  Decimal  @default(0)
+  enabledModules  String   @default("[]")
+  featureFlags    String   @default("{}")
+  updatedAt       DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         Role
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+  bookings     Booking[]  @relation("BookingStaff")
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String?
+  notes     String?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bookings  Booking[]
+}
+
+enum DressCategory {
+  OCCASIONAL
+  BRIDESMAID
+}
+
+model Dress {
+  id            String          @id @default(cuid())
+  name          String
+  category      DressCategory
+  size          String?
+  color         String?
+  notes         String?
+  qtyTotal      Int             @default(1)
+  rentalPrice   Decimal         @default(0)
+  depositAmount Decimal         @default(0)
+  photoPath     String?
+  listedPublic  Boolean         @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  lines         BookingLine[]
+}
+
+enum BookingStatus {
+  INQUIRY
+  CONFIRMED
+  PICKED_UP
+  RETURNED
+  OVERDUE
+  CANCELLED
+}
+
+enum BookingSource {
+  WEB_ENQUIRE
+  STAFF
+}
+
+model Booking {
+  id              String         @id @default(cuid())
+  customerId      String
+  customer        Customer       @relation(fields: [customerId], references: [id])
+  eventDate       DateTime?
+  pickupDate      DateTime?
+  returnDate      DateTime?
+  status          BookingStatus  @default(INQUIRY)
+  source          BookingSource  @default(STAFF)
+  followUpDate    DateTime?
+  followUpNote    String?
+  rentalTotal     Decimal        @default(0)
+  depositTotal    Decimal        @default(0)
+  depositHeld     Boolean        @default(true)
+  moneyNotes      String?
+  notes           String?
+  createdById     String?
+  createdBy       User?          @relation("BookingStaff", fields: [createdById], references: [id])
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lines           BookingLine[]
+}
+
+model BookingLine {
+  id          String  @id @default(cuid())
+  bookingId   String
+  booking     Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  dressId     String
+  dress       Dress   @relation(fields: [dressId], references: [id])
+  qty         Int     @default(1)
+  unitRental  Decimal @default(0)
+  unitDeposit Decimal @default(0)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  summary   String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,135 @@
+name: Build and deploy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Production build
+        env:
+          NODE_ENV: production
+          DATABASE_URL: file:./prisma/ci.db
+          AUTH_SECRET: ci-build-placeholder-not-used-at-runtime
+          APP_URL: ${{ secrets.APP_URL || 'https://localhost' }}
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        with:
+          name: next-build
+          path: .next
+          include-hidden-files: true
+          retention-days: 3
+
+  deploy:
+    name: Deploy after merge
+    needs: build
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
+      - name: Require deploy secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          missing=
+          [ -n "$SSH_HOST" ] || missing="$missing SSH_HOST"
+          [ -n "$SSH_USER" ] || missing="$missing SSH_USER"
+          [ -n "$SSH_PRIVATE_KEY" ] || missing="$missing SSH_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "Missing GitHub secrets:$missing"
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Secrets are present (host=$SSH_HOST user=$SSH_USER)."
+      - name: Write SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          python3 << 'PY'
+          import os, base64, textwrap
+          from pathlib import Path
+          raw = os.environ["SSH_PRIVATE_KEY"].strip().strip('"').strip("'")
+          raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+          if "BEGIN" not in raw:
+              try:
+                  decoded = base64.b64decode(raw).decode("utf-8")
+                  if "BEGIN" in decoded:
+                      raw = decoded
+              except Exception:
+                  pass
+          raw = raw.replace("\\n", "\n")
+          if "BEGIN OPENSSH PRIVATE KEY-----" in raw and "\n" not in raw.split("-----", 2)[1]:
+              body = raw
+              body = body.replace("-----BEGIN OPENSSH PRIVATE KEY-----", "")
+              body = body.replace("-----END OPENSSH PRIVATE KEY-----", "")
+              body = body.replace(" ", "").replace("\n", "")
+              wrapped = "\n".join(textwrap.wrap(body, 70))
+              raw = "-----BEGIN OPENSSH PRIVATE KEY-----\n" + wrapped + "\n-----END OPENSSH PRIVATE KEY-----\n"
+          if not raw.endswith("\n"):
+              raw += "\n"
+          first = raw.splitlines()[0] if raw.splitlines() else ""
+          if "BEGIN" not in first:
+              raise SystemExit("SSH_PRIVATE_KEY is invalid. Update the GitHub secret with the private key file contents.")
+          path = Path.home() / ".ssh" / "deploy_key"
+          path.write_text(raw)
+          path.chmod(0o600)
+          print("SSH key file written.")
+          PY
+          ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null
+          echo "SSH private key parses OK."
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+      - name: Test SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "echo SSH_OK && pwd && ls satis/server.js"
+      - name: Upload files
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          rsync -avz -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes" --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'node_modules/' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'prisma/*.db' \
+            --exclude 'prisma/*.db-journal' \
+            --exclude 'prisma/*.db-wal' \
+            --exclude 'uploads/' \
+            --exclude '.next/cache/' \
+            --exclude '*.zip' \
+            ./ "$SSH_USER@$SSH_HOST:/home/hundaft1/satis/"
+      - name: Install, migrate, restart
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST" "bash ~/satis/scripts/cpanel-after-deploy.sh"

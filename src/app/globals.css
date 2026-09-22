@@ -1,0 +1,53 @@
+/* Satis dress rental — Tailwind v4 */
+@import "tailwindcss";
+
+:root {
+  --paper: #faf6f4;
+  --ink: #2a1f24;
+  --muted: #7a6a70;
+  --line: #eddfe3;
+  --card: #fffdfc;
+  /* Brand peach pink from Satis logo */
+  --teal: #f5bfcc;
+  --teal-dark: #bf697e;
+  --brass: #c47a8a;
+  --brass-soft: #fce8ee;
+  --good: #166534;
+  --bad: #9b1c1c;
+  --warn: #a16207;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-teal: var(--teal);
+  --color-teal-dark: var(--teal-dark);
+  --color-brass: var(--brass);
+  --color-brass-soft: var(--brass-soft);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
