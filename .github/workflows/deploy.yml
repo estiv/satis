@@ -23,10 +23,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - name: Create empty SQLite DB for build-time prerender
+        env:
+          DATABASE_URL: file:./ci.db
+        run: npx prisma db push
       - name: Production build
         env:
           NODE_ENV: production
-          DATABASE_URL: file:./prisma/ci.db
+          DATABASE_URL: file:./ci.db
           AUTH_SECRET: ci-build-placeholder-not-used-at-runtime
           APP_URL: ${{ secrets.APP_URL || 'https://localhost' }}
         run: npm run build
