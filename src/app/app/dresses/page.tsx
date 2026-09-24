@@ -1,80 +1,13 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { chipClass, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import { chipClass, PageHeader } from "@/components/ui";
 import { FormModal, DeleteButton } from "@/components/modal";
 import { deleteDress, saveDress } from "@/modules/dresses/actions";
 import { DressGrid } from "@/components/dress-card";
+import { DressFields } from "@/components/dress-fields";
 import { num } from "@/core/money";
-import { DRESS_CATEGORIES } from "@/core/labels";
-
-function DressFields({
-  dress,
-}: {
-  dress?: {
-    name: string;
-    category: string;
-    size: string | null;
-    color: string | null;
-    notes: string | null;
-    qtyTotal: number;
-    rentalPrice: number;
-    depositAmount: number;
-    listedPublic: boolean;
-  };
-}) {
-  return (
-    <>
-      <Field label="Name">
-        <Input name="name" required defaultValue={dress?.name} />
-      </Field>
-      <Field label="Category">
-        <Select name="category" defaultValue={dress?.category ?? "OCCASIONAL"}>
-          {Object.entries(DRESS_CATEGORIES).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Size">
-          <Input name="size" defaultValue={dress?.size ?? ""} />
-        </Field>
-        <Field label="Color">
-          <Input name="color" defaultValue={dress?.color ?? ""} />
-        </Field>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Quantity">
-          <Input name="qtyTotal" inputMode="numeric" defaultValue={dress?.qtyTotal ?? 1} />
-        </Field>
-        <Field label="Rental price">
-          <Input name="rentalPrice" inputMode="decimal" defaultValue={String(num(dress?.rentalPrice))} />
-        </Field>
-        <Field label="Default deposit">
-          <Input
-            name="depositAmount"
-            inputMode="decimal"
-            defaultValue={String(num(dress?.depositAmount))}
-          />
-        </Field>
-      </div>
-      <Field label="Show on public shop">
-        <Select name="listedPublic" defaultValue={dress?.listedPublic === false ? "0" : "1"}>
-          <option value="1">Yes — listed</option>
-          <option value="0">No — staff only</option>
-        </Select>
-      </Field>
-      <Field label="Notes">
-        <Textarea name="notes" defaultValue={dress?.notes ?? ""} />
-      </Field>
-      <Field label="Photo" hint="JPG, PNG or WebP">
-        <Input name="photo" type="file" accept="image/*" />
-      </Field>
-    </>
-  );
-}
+import { DRESS_CATEGORIES, formatDressSizes } from "@/core/labels";
 
 export default async function StaffDressesPage({
   searchParams,
@@ -119,6 +52,7 @@ export default async function StaffDressesPage({
               <p className="font-medium">{d.name}</p>
               <p className="text-xs text-muted">
                 {DRESS_CATEGORIES[d.category]} · qty {d.qtyTotal}
+                {formatDressSizes(d.size) ? ` · ${formatDressSizes(d.size)}` : ""}
                 {!d.listedPublic ? " · hidden from shop" : ""}
               </p>
             </div>
@@ -140,6 +74,7 @@ export default async function StaffDressesPage({
                     notes: d.notes,
                     qtyTotal: d.qtyTotal,
                     rentalPrice: num(d.rentalPrice),
+                    rentalPriceMax: num(d.rentalPriceMax),
                     depositAmount: num(d.depositAmount),
                     listedPublic: d.listedPublic,
                   }}

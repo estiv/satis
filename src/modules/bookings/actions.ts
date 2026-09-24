@@ -53,11 +53,13 @@ export async function saveBooking(_prev: ActionState, formData: FormData): Promi
 
     let cid = customerId;
     if (!cid) {
-      if (!customerName) return { error: "Customer is required." };
+      if (!customerName) return { error: "Customer name is required." };
+      if (!customerPhone) return { error: "Customer phone is required." };
       const c = await prisma.customer.create({
         data: { name: customerName, phone: customerPhone ?? null },
       });
       cid = c.id;
+      revalidatePath("/app/customers");
     }
 
     const eventDate = parseDate(str(formData, "eventDate"));
@@ -67,6 +69,13 @@ export async function saveBooking(_prev: ActionState, formData: FormData): Promi
     const status = (str(formData, "status") || "CONFIRMED") as BookingStatus;
     const lines = parseLines(formData);
     if (lines.length === 0) return { error: "Add at least one dress line." };
+
+    if (eventDate && pickupDate && pickupDate.getTime() > eventDate.getTime()) {
+      return { error: "Pickup must be on or before the event date." };
+    }
+    if (pickupDate && returnDate && returnDate.getTime() < pickupDate.getTime()) {
+      return { error: "Return must be on or after the pickup date." };
+    }
 
     const range = bookingRange({ pickupDate, returnDate, eventDate });
     if (!range) return { error: "Set an event date or pickup/return dates." };

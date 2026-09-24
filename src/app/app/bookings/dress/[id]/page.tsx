@@ -2,28 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { money, num } from "@/core/money";
-import { BOOKING_STATUSES, DRESS_CATEGORIES } from "@/core/labels";
+import { money, moneyRange, num } from "@/core/money";
+import { BOOKING_STATUSES, DRESS_CATEGORIES, formatDressSizes } from "@/core/labels";
 import { Badge, Card, PageHeader, Stat, chipClass, buttonClass } from "@/components/ui";
 import { type DressOption } from "@/components/booking-lines";
 import { markBookingReturned } from "@/modules/bookings/actions";
-import { bookingRange } from "@/modules/bookings/availability";
 import { ConfirmForm } from "@/components/modal";
 import { DressBookingForm } from "@/components/dress-booking-form";
 import { isoDate } from "@/core/labels";
 import type { BookingStatus } from "@prisma/client";
-
-function formatRange(b: {
-  pickupDate: Date | null;
-  returnDate: Date | null;
-  eventDate: Date | null;
-}) {
-  const range = bookingRange(b);
-  if (!range) return "—";
-  const start = isoDate(range.start);
-  const end = isoDate(range.end);
-  return start === end ? start : `${start} → ${end}`;
-}
 
 export default async function DressBookingPage({
   params,
@@ -65,6 +52,7 @@ export default async function DressBookingPage({
     id: d.id,
     name: d.name,
     rentalPrice: num(d.rentalPrice),
+    rentalPriceMax: num(d.rentalPriceMax),
     depositAmount: num(d.depositAmount),
     qtyTotal: d.qtyTotal,
   }));
@@ -96,7 +84,7 @@ export default async function DressBookingPage({
     <div>
       <PageHeader
         title={dress.name}
-        subtitle={`${DRESS_CATEGORIES[dress.category]}${dress.size ? ` · ${dress.size}` : ""}${dress.color ? ` · ${dress.color}` : ""} · qty ${dress.qtyTotal}`}
+        subtitle={`${DRESS_CATEGORIES[dress.category]}${formatDressSizes(dress.size) ? ` · ${formatDressSizes(dress.size)}` : ""}${dress.color ? ` · ${dress.color}` : ""} · qty ${dress.qtyTotal}`}
         actions={
           <Link href="/app/bookings" className={buttonClass("secondary")}>
             ← All dresses
@@ -123,12 +111,11 @@ export default async function DressBookingPage({
         <Card>
           <h2 className="text-lg font-semibold">New booking</h2>
           <p className="mt-1 text-sm text-muted">
-            Rental {money(dress.rentalPrice)} · deposit {money(dress.depositAmount)}
+            Rental {moneyRange(dress.rentalPrice, dress.rentalPriceMax)} · deposit {money(dress.depositAmount)}
           </p>
           <DressBookingForm
             dressId={dress.id}
             rentalPrice={num(dress.rentalPrice)}
-            depositAmount={num(dress.depositAmount)}
             customers={customers}
             dresses={dresses}
           />
@@ -172,6 +159,9 @@ export default async function DressBookingPage({
                 <th className="py-2 pr-3 font-medium">Dates</th>
                 <th className="py-2 pr-3 font-medium">Qty</th>
                 <th className="py-2 pr-3 font-medium">Rental</th>
+                <th className="py-2 pr-3 font-medium">Deposit</th>
+                <th className="py-2 pr-3 font-medium">Payment</th>
+                <th className="py-2 pr-3 font-medium">Notes</th>
                 <th className="py-2 pr-3 font-medium">Status</th>
                 <th className="py-2 font-medium">Action</th>
               </tr>
@@ -179,7 +169,7 @@ export default async function DressBookingPage({
             <tbody>
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">
+                  <td colSpan={9} className="py-8 text-center text-muted">
                     No bookings yet for this dress.
                   </td>
                 </tr>
@@ -200,9 +190,25 @@ export default async function DressBookingPage({
                         </Link>
                         <p className="text-xs text-muted">{h.booking.customer.phone || "—"}</p>
                       </td>
-                      <td className="py-3 pr-3 text-muted">{formatRange(h.booking)}</td>
+                      <td className="py-3 pr-3 text-muted">
+                        <p>Event {isoDate(h.booking.eventDate) || "—"}</p>
+                        <p>Pickup {isoDate(h.booking.pickupDate) || "—"}</p>
+                        <p>Return {isoDate(h.booking.returnDate) || "—"}</p>
+                        {h.booking.followUpDate || h.booking.followUpNote ? (
+                          <p>
+                            Follow-up {isoDate(h.booking.followUpDate) || "—"}
+                            {h.booking.followUpNote ? ` · ${h.booking.followUpNote}` : ""}
+                          </p>
+                        ) : null}
+                      </td>
                       <td className="py-3 pr-3">{h.qty}</td>
                       <td className="py-3 pr-3 num">{money(h.qty * h.unitRental)}</td>
+                      <td className="py-3 pr-3 num">
+                        {money(h.qty * h.unitDeposit)}
+                        {h.booking.depositHeld ? " held" : ""}
+                      </td>
+                      <td className="max-w-48 py-3 pr-3 text-muted">{h.booking.moneyNotes || "—"}</td>
+                      <td className="max-w-48 py-3 pr-3 text-muted">{h.booking.notes || "—"}</td>
                       <td className="py-3 pr-3">
                         <Badge
                           tone={
@@ -219,7 +225,11 @@ export default async function DressBookingPage({
                         </Badge>
                       </td>
                       <td className="py-3">
-                        {canReturn ? (
+                        <div className="flex flex-col items-start gap-2">
+                          <Link href={`/app/bookings/${h.booking.id}`} className={buttonClass("secondary")}>
+                            Details
+                          </Link>
+                          {canReturn ? (
                           <ConfirmForm
                             action={markBookingReturned}
                             label="Returned"
@@ -228,9 +238,8 @@ export default async function DressBookingPage({
                           >
                             <input type="hidden" name="id" value={h.booking.id} />
                           </ConfirmForm>
-                        ) : (
-                          <span className="text-xs text-muted">—</span>
-                        )}
+                        ) : null}
+                        </div>
                       </td>
                     </tr>
                   );

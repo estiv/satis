@@ -10,6 +10,21 @@ export const DRESS_CATEGORIES: Record<DressCategory, string> = {
   BRIDESMAID: "Bridesmaid",
 };
 
+/** Every size a dress unit can be assigned. Quantity decides how many of these can be chosen. */
+export const DRESS_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
+
+export function parseDressSizes(size: string | null | undefined) {
+  if (!size) return [];
+  return size
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function formatDressSizes(size: string | null | undefined) {
+  return parseDressSizes(size).join(", ");
+}
+
 export const BOOKING_STATUSES: Record<BookingStatus, string> = {
   INQUIRY: "Inquiry",
   CONFIRMED: "Confirmed",

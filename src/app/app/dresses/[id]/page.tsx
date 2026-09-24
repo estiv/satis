@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { money } from "@/core/money";
+import { moneyRange } from "@/core/money";
 import { BOOKING_STATUSES, DRESS_CATEGORIES, isoDate } from "@/core/labels";
 import { Badge, Card, PageHeader, buttonClass } from "@/components/ui";
 import { bookingRange } from "@/modules/bookings/availability";
@@ -34,7 +34,7 @@ export default async function StaffDressDetailPage({
     <div>
       <PageHeader
         title={dress.name}
-        subtitle={`${DRESS_CATEGORIES[dress.category]} · qty ${dress.qtyTotal} · ${money(dress.rentalPrice)}`}
+        subtitle={`${DRESS_CATEGORIES[dress.category]} · qty ${dress.qtyTotal} · ${moneyRange(dress.rentalPrice, dress.rentalPriceMax)}`}
         actions={
           <Link href={`/app/bookings/dress/${dress.id}`} className={buttonClass("primary")}>
             Book / history

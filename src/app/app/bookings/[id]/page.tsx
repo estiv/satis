@@ -8,6 +8,7 @@ import { Badge, Card, Field, Input, PageHeader, Select, Textarea, buttonClass } 
 import { FormModal } from "@/components/modal";
 import { saveBooking, updateBookingStatus } from "@/modules/bookings/actions";
 import { BookingLinesEditor, type DressOption } from "@/components/booking-lines";
+import { CustomerSearchSelect } from "@/components/customer-search-select";
 
 export default async function BookingDetailPage({
   params,
@@ -30,6 +31,7 @@ export default async function BookingDetailPage({
     id: d.id,
     name: d.name,
     rentalPrice: num(d.rentalPrice),
+    rentalPriceMax: num(d.rentalPriceMax),
     depositAmount: num(d.depositAmount),
     qtyTotal: d.qtyTotal,
   }));
@@ -42,15 +44,8 @@ export default async function BookingDetailPage({
         actions={
           <FormModal title="Edit booking" trigger="Edit" action={saveBooking} submitLabel="Save" xl>
             <input type="hidden" name="id" value={booking.id} />
-            <input type="hidden" name="customerId" value={booking.customerId} />
             <Field label="Customer">
-              <Select name="customerId" defaultValue={booking.customerId}>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+              <CustomerSearchSelect customers={customers} defaultId={booking.customerId} required />
             </Field>
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Event date">

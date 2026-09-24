@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { money, num } from "@/core/money";
-import { DRESS_CATEGORIES } from "@/core/labels";
+import { money, moneyRange, num } from "@/core/money";
+import { DRESS_CATEGORIES, formatDressSizes } from "@/core/labels";
 import type { Dress, DressCategory } from "@prisma/client";
 import { Badge } from "./ui";
 
@@ -12,7 +12,16 @@ export function DressThumb({
 }: {
   dress: Pick<
     Dress,
-    "id" | "name" | "category" | "size" | "color" | "rentalPrice" | "qtyTotal" | "photoPath" | "listedPublic"
+    | "id"
+    | "name"
+    | "category"
+    | "size"
+    | "color"
+    | "rentalPrice"
+    | "rentalPriceMax"
+    | "qtyTotal"
+    | "photoPath"
+    | "listedPublic"
   >;
   href: string;
   showQty?: boolean;
@@ -42,11 +51,13 @@ export function DressThumb({
         </div>
         <p className="text-xs text-muted">
           {DRESS_CATEGORIES[dress.category as DressCategory]}
-          {dress.size ? ` · ${dress.size}` : ""}
+          {formatDressSizes(dress.size) ? ` · ${formatDressSizes(dress.size)}` : ""}
           {dress.color ? ` · ${dress.color}` : ""}
         </p>
         {showPrice ? (
-          <p className="mt-auto pt-2 text-sm font-semibold text-teal-dark num">{money(dress.rentalPrice)}</p>
+          <p className="mt-auto pt-2 text-sm font-semibold text-teal-dark num">
+            {moneyRange(dress.rentalPrice, dress.rentalPriceMax)}
+          </p>
         ) : null}
         {showQty ? <p className="text-xs text-muted">Qty {dress.qtyTotal}</p> : null}
       </div>

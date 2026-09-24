@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["bcryptjs", "@prisma/client"],
   agentRules: false,
   experimental: {
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
     cpus: 1,
     workerThreads: false,
     webpackBuildWorker: false,

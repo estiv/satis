@@ -4,6 +4,30 @@ export function money(value: Prisma.Decimal | number | string | null | undefined
   return `${amount(value)} ${currency}`;
 }
 
+/** Lowest–highest rental. A missing or lower high price is shown as a single price. */
+export function moneyRange(
+  low: Prisma.Decimal | number | string | null | undefined,
+  high: Prisma.Decimal | number | string | null | undefined,
+  currency = "ETB",
+) {
+  const a = num(low);
+  const b = num(high);
+  if (b > a) return `${money(a, currency)} – ${money(b, currency)}`;
+  return money(a, currency);
+}
+
+/** Deposit is always half the rental. A price range becomes a deposit range. */
+export function depositRange(
+  low: Prisma.Decimal | number | string | null | undefined,
+  high: Prisma.Decimal | number | string | null | undefined,
+  currency = "ETB",
+) {
+  const a = roundMoney(num(low) / 2);
+  const b = roundMoney(num(high) / 2);
+  if (b > a) return `${money(a, currency)} – ${money(b, currency)}`;
+  return money(a, currency);
+}
+
 export function amount(value: Prisma.Decimal | number | string | null | undefined) {
   const n = value == null ? 0 : Number(value);
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

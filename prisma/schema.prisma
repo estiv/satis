@@ -74,9 +74,10 @@ model Dress {
   size          String?
   color         String?
   notes         String?
-  qtyTotal      Int             @default(1)
-  rentalPrice   Decimal         @default(0)
-  depositAmount Decimal         @default(0)
+  qtyTotal       Int             @default(1)
+  rentalPrice    Decimal         @default(0)
+  rentalPriceMax Decimal         @default(0)
+  depositAmount  Decimal         @default(0)
   photoPath     String?
   listedPublic  Boolean         @default(true)
   deletedAt     DateTime?

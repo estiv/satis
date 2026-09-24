@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { bool, num, opt, str, type ActionState } from "@/lib/form";
+import { DRESS_SIZES } from "@/core/labels";
 import { dec } from "@/core/money";
 import { saveDressPhoto } from "@/lib/uploads";
 
@@ -30,15 +31,30 @@ export async function saveDress(_prev: ActionState, formData: FormData): Promise
     return { error: "Category must be Occasional or Bridesmaid." };
   }
 
+  const qtyTotal = Math.min(24, Math.max(1, Math.floor(num(formData, "qtyTotal") || 1)));
+  const sizes = formData
+    .getAll("sizes")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  if (sizes.length !== qtyTotal) return { error: "Choose a size for each dress in stock." };
+  if (sizes.some((size) => !DRESS_SIZES.includes(size as (typeof DRESS_SIZES)[number]))) {
+    return { error: "Choose a size from the list." };
+  }
+
+  const rentalLow = Math.max(0, num(formData, "rentalPrice"));
+  const rentalHigh = Math.max(0, num(formData, "rentalPriceMax"));
+  if (rentalHigh < rentalLow) return { error: "Highest rental price must be at least the lowest." };
+
   const data = {
     name,
     category,
-    size: opt(formData, "size") ?? null,
+    size: sizes.join(", "),
     color: opt(formData, "color") ?? null,
     notes: opt(formData, "notes") ?? null,
-    qtyTotal: Math.max(0, Math.floor(num(formData, "qtyTotal") || 1)),
-    rentalPrice: dec(num(formData, "rentalPrice")),
-    depositAmount: dec(num(formData, "depositAmount")),
+    qtyTotal,
+    rentalPrice: dec(rentalLow),
+    rentalPriceMax: dec(rentalHigh),
+    depositAmount: dec(Math.max(0, num(formData, "depositAmount"))),
     listedPublic: bool(formData, "listedPublic"),
   };
 
